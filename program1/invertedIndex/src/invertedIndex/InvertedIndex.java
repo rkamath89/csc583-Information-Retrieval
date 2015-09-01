@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Stack;
 import java.util.TreeMap;
 
 
@@ -21,12 +22,135 @@ public class InvertedIndex {
 		AND,OR,MIX;
 	};
 	static operation op;
-	static boolean debug = true;
+	static boolean debug = false;
 	static List<String> fileNames = new ArrayList<String>(); // Keep Track of File Names
 	static int documentId = 0; // Keep Track Of  Document Ids
 	static TreeMap<String,LinkedList<Integer>> docListings = new TreeMap<String,LinkedList<Integer>>(); // Document Id and its posting
 	
-	static void andQueries(String query)
+	
+	static void mixedQueries(String query)
+	{
+		Stack<String> queryStack = new Stack<String>();
+		String[] splitQuery = query.split(" ");
+		StringBuilder queryFetched = new StringBuilder();
+		for(String splitWord:splitQuery)
+		{
+			if(")".equalsIgnoreCase(splitWord))
+			{
+				while(!queryStack.isEmpty())
+				{
+					String value = queryStack.pop();
+					if("(".equalsIgnoreCase(value))
+					{
+						System.out.println("Query :"+queryFetched.toString());
+						break;
+					}
+					else
+					{
+						StringBuilder temp = new StringBuilder(value);
+						temp.append(" "+queryFetched);
+						queryFetched = temp;
+					}
+				}
+			}
+			else
+			{
+				queryStack.push(splitWord);
+			}
+				
+		}
+		StringBuilder tempStr = new StringBuilder();
+		while(!queryStack.isEmpty())
+		{
+			String value = queryStack.pop();
+			StringBuilder temp = new StringBuilder(value);
+			temp.append(" "+tempStr);
+			tempStr = temp;
+		}
+		queryFetched.append(tempStr);
+		System.out.println("Query :"+queryFetched.toString());
+		
+	}
+	
+	static List<Integer> orQueries(String query)
+	{
+		List<Integer> result = new ArrayList<Integer>();
+		List<Integer> tempResult = new ArrayList<Integer>();
+		String terms[] = query.split(" ");
+		List<String> termsWithoutKeyWord = new ArrayList<String>();
+		for(String key:terms)
+		{
+			if("OR".equals(key))
+			{
+				continue;
+			}
+			else
+			{
+				termsWithoutKeyWord.add(key);
+			}
+		}
+		if(debug)
+		{
+			System.out.println();
+			System.out.print("Terms to find OR Query on are : ");
+			for(String word:termsWithoutKeyWord)
+			{
+				System.out.print(word+" ,");
+			}
+			System.out.println();
+		}
+		for(String queryWord: termsWithoutKeyWord)
+		{
+
+			try
+			{
+				if(result.isEmpty())
+				{
+					if(docListings.containsKey(queryWord))
+						result.addAll(docListings.get(queryWord));
+				}
+				else
+				{
+					if(docListings.containsKey(queryWord))
+					{
+						LinkedList<Integer> tempList = docListings.get(queryWord);
+						for(Integer val:tempList)
+						{
+							if(!result.contains(val))
+							{
+								result.add(val);
+							}
+						}
+					}
+				}
+			}
+			catch(Exception e)
+			{
+				System.out.println(e.getMessage());
+				result.clear();
+				tempResult.clear();
+			}
+			
+		
+		}
+		if(debug)
+		{
+			System.out.println();
+			System.out.println("Final Result for : "+query);
+			Collections.sort(result);
+			for(Integer res:result)
+			{
+				System.out.print(res+" ,");
+			}
+			System.out.println();
+		}
+		return result;
+	}
+	
+	
+	
+	
+	static List<Integer> andQueries(String query)
 	{
 		List<Integer> result = new ArrayList<Integer>();
 		List<Integer> tempResult = new ArrayList<Integer>();
@@ -106,18 +230,22 @@ public class InvertedIndex {
 		if(debug)
 		{
 			System.out.println();
-			System.out.println("Final Result");
+			System.out.println("Final Result for : "+query);
+			Collections.sort(result);
 			for(Integer res:result)
 			{
 				System.out.print(res+" ,");
 			}
 			System.out.println();
 		}
+		return result;
 	} 
 	
 	
 	static void printContentsOfMap(TreeMap<String,LinkedList<Integer>> printMap)
 	{
+		System.out.println("--------------------------------------------");
+		System.out.println("Inverted Index Contents");
 		if(printMap != null && printMap.entrySet() != null)
 		{
 			Iterator iter =  printMap.entrySet().iterator();
@@ -131,6 +259,8 @@ public class InvertedIndex {
 				}
 			}
 		}
+		System.out.println("--------------------------------------------");
+		System.out.println();
 			
 	}
 	/*Old function , i shiftd to TreeMap this maintains ordering
@@ -171,8 +301,14 @@ public class InvertedIndex {
 		String splitLine[] = line.split(" ");
 		if(splitLine != null)
 		{
+			boolean firstToken = true; // Skip the 1st Token this is the Document ID
 			for(String token: splitLine)
 			{
+				if(firstToken)
+				{
+					firstToken = false;
+					continue;
+				}
 				if(!docListings.containsKey(token))
 				{
 					LinkedList<Integer> newList = new LinkedList<Integer>();
@@ -192,7 +328,7 @@ public class InvertedIndex {
 	{
 		for(String fname: fileNames)
 		{
-			documentId++;
+			
 			String line = null;
 			try
 			{
@@ -200,6 +336,7 @@ public class InvertedIndex {
 				BufferedReader bufffer = new BufferedReader(inFile);
 				  while((line = bufffer.readLine()) != null) 
 				  {
+					  	documentId++;
 		                parseLineForDocId(documentId,line);
 		          } 
 				  bufffer.close();
@@ -215,40 +352,90 @@ public class InvertedIndex {
 			
 		}
 	}
+	public static void printResults(List<Integer> results,String query)
+	{
+		if(!results.isEmpty())
+		{
+			Collections.sort(results);
+		}
+		System.out.println();
+		System.out.println("Final Result for : "+query);
+		for(Integer val:results)
+		{
+			System.out.print(val+" ,");
+			
+		}
+		System.out.println();
+	}
+	public static void checkTypeOfOperation(String queryReceived)
+	{
+		String ops = "";
+		String queryParsed[] = queryReceived.split(" ");
+		for(String word:queryParsed)
+		{
+			if("AND".equals(word) && (ops.equals("") || ops.equals("AND")))
+			{
+				ops = "AND";
+			}
+			else if("OR".equals(word) && (ops.equals("") || ops.equals("OR")))
+			{
+				ops = "OR";
+			}
+			else if( ("AND".equals(word) && "OR".equals(ops)) || ("OR".equals(word) && "AND".equals(ops)))
+			{
+				ops = "MIX";
+				break;
+			}
+		}
+		if("AND".equals(ops))
+		{
+			op = operation.AND;
+		}
+		else if("OR".equals(ops))
+		{
+			op = operation.OR;
+		}
+		else
+		{
+			op = operation.MIX;
+		}
+	}
 	public static void main(String[] args) 
 	{
+		//Argumennts will Be of the FOrm [ Y/N InputFile.txt drug and or
 		boolean encounteredOp = false;
 		StringBuilder query = new StringBuilder();
+		List<Integer> results = new ArrayList<Integer>();
+		int argCount =0;
 		for (String arguments : args) 
 		{
-			if(!encounteredOp && (arguments.equalsIgnoreCase("-1") || arguments.equalsIgnoreCase("-2") || arguments.equalsIgnoreCase("-3")))
+			if(argCount == 0)// Check if we are Debugging
 			{
-				encounteredOp = true;
-				if(arguments.equalsIgnoreCase("-1"))
+				if(arguments.equalsIgnoreCase("Y"))
 				{
-					op = operation.AND;
+					debug = true;
 				}
-				else if(arguments.equalsIgnoreCase("-2"))
+				else
 				{
-					op = operation.OR;
+					debug= false;
 				}
-				else if(arguments.equalsIgnoreCase("-3"))
-				{
-					op = operation.MIX;
-				}
+				argCount++;
 				continue;
 			}
-			if(!encounteredOp)
+			else if(argCount == 1) // This is Input File
 			{
 				StringBuilder stringBuild = new StringBuilder(arguments);
 				stringBuild.append(".txt");
 				fileNames.add(stringBuild.toString());
+				argCount++;
 			}
 			else
 			{
 				query.append(arguments+" ");
 			}
 		}
+		
+		checkTypeOfOperation(query.toString());// Check if AND ,OR , MIX
 		if(debug)
 		{
 			System.out.println("Query is :: " +query.toString());
@@ -260,20 +447,36 @@ public class InvertedIndex {
 		}
 		readFileContents();
 		//System.out.println(" Unsorted Values");
-		if(debug)
-			printContentsOfMap(docListings);
+		
+		// Print the Inverted Index
+		printContentsOfMap(docListings);
+		
+		
 		if(op == operation.AND)
 		{
 			if(debug)
 			{
 				System.out.println("Performing AND Processing");	
 			}
-			andQueries(query.toString());
+			results = andQueries(query.toString());
+		}
+		else if(op == operation.OR)
+		{
+			if(debug)
+			{
+				System.out.println("Performing OR Processing");	
+			}
+			results = orQueries(query.toString());
+		}
+		else if(op == operation.MIX)
+		{
+			mixedQueries(query.toString());
 		}
 		//System.out.println("Sorted Values");
 		//sortMap();
 		//if(debug)
 			//printContentsOfMap(sortedDocListings);
+		printResults(results,query.toString());
 
 	}
 
