@@ -30,33 +30,35 @@ public class InvertedIndex
 
 
 
-	public static LinkedList<Integer> evaluate(String expression)
+	public static LinkedList<Integer> performShuntingsAlgo(String expression)
 	{
 		String[] tokens = expression.split(" ");
 
 		// Stack for List of Documetns containing word
 		Stack<LinkedList<Integer>> documents = new Stack<LinkedList<Integer>>();
 
-		// Stack for Operators AND OR
+		// Stack for Operators AND , OR
 		Stack<String> ops = new Stack<String>();
 
 		for(String token:tokens)
 		{
-
 			// Current token is a Word, push it to stack for words
 			if (!"(".equals(token) && !")".equals(token) && !"AND".equals(token) && !"OR".equals(token))
 			{
-				documents.push(docListings.get(token));
+				if(docListings.containsKey(token))
+					documents.push(docListings.get(token));
+				else
+					documents.push(new LinkedList<Integer>());
 			}
-			// Current token is an opening brace, push it to 'ops'
+			// If opening Brace push it onto OP's
 			else if ("(".equals(token))
 				ops.push(token);
 
-			// Closing brace encountered, solve entire brace
+			// Solve it if closing brace encountered
 			else if (")".equals(token))
 			{
 				while (!"(".equals(ops.peek()))
-					documents.push(applyOp(ops.pop(), documents.pop(), documents.pop()));
+					documents.push(solveExpression(ops.pop(), documents.pop(), documents.pop()));
 				ops.pop();
 			}
 
@@ -67,20 +69,18 @@ public class InvertedIndex
 				// token, which is an operator. Apply operator on top of 'ops'
 				// to top two elements in values stack
 				while (!ops.empty() && hasPrecedence(token, ops.peek()))
-					documents.push(applyOp(ops.pop(), documents.pop(), documents.pop()));
+					documents.push(solveExpression(ops.pop(), documents.pop(), documents.pop()));
 
 				// Push current token to 'ops'.
 				ops.push(token);
 			}
 		}
 
-		// Entire expression has been parsed at this point, apply remaining
-		// ops to remaining values
+		// Evaluate remaining Values
 		while (!ops.empty())
-			documents.push(applyOp(ops.pop(), documents.pop(), documents.pop()));
+			documents.push(solveExpression(ops.pop(), documents.pop(), documents.pop()));
 
-		// Top of 'values' contains result, return it
-		return documents.pop();
+		return documents.pop(); // Returning Result
 	}
 
 	// Returns true if 'op2' has higher or same precedence as 'op1',
@@ -95,9 +95,7 @@ public class InvertedIndex
 			return true;
 	}
 
-	// A utility method to apply an operator 'op' on operands 'a' 
-	// and 'b'. Return the result.
-	public static LinkedList<Integer>  applyOp(String op, LinkedList<Integer> b, LinkedList<Integer> a)
+	public static LinkedList<Integer>  solveExpression(String op, LinkedList<Integer> b, LinkedList<Integer> a)
 	{
 		LinkedList<Integer> result = new LinkedList<Integer>();
 		if("AND".equals(op))
@@ -304,41 +302,43 @@ public class InvertedIndex
 		{
 			try
 			{
-				if(result.isEmpty())
+				if(tempResult.isEmpty())
 				{
 					if(docListings.containsKey(queryWord))
-						result.addAll(docListings.get(queryWord));
+						tempResult.addAll(docListings.get(queryWord));
 				}
 				else
 				{
-					for(Integer existingResult: result)
+					if(docListings.containsKey(queryWord))
 					{
-						if(docListings.containsKey(queryWord))
+						int i=0,j=0;
+						LinkedList<Integer> fetchedList = docListings.get(queryWord);
+						while(i < tempResult.size() && j < fetchedList.size())
 						{
-							for(Integer newResult:docListings.get(queryWord))
+							if((tempResult.get(i).intValue() == fetchedList.get(j).intValue()) && (!result.contains(tempResult.get(i))))
 							{
-								if(existingResult.intValue() == newResult.intValue())
-								{
-									if(!tempResult.contains(existingResult))
-										tempResult.add(existingResult);
-								}
-							}	
+								result.add(tempResult.get(i));
+								i++;
+								j++;
+							}
+							else if(tempResult.get(i).intValue() < fetchedList.get(j).intValue())
+							{
+								i++;
+							}
+							else
+							{
+								j++;
+							}
 						}
-						else
-						{
-							result.clear();
-							tempResult.clear();
-							throw new Exception("No Document Contains Key :"+queryWord);
-						}
+						tempResult.clear();
+						tempResult.addAll(result);
 					}
-					result.clear();
-					result.addAll(tempResult);
-					if(debug)
+					else
 					{
-						System.out.println("Contents of Result after Key :: "+queryWord);
-						System.out.println(result);
+						result.clear();
+						tempResult.clear();
+						throw new Exception("No Document Contains Key :"+queryWord);
 					}
-
 				}
 			}
 			catch(Exception e)
@@ -480,6 +480,11 @@ public class InvertedIndex
 		{
 			Collections.sort(results);
 		}
+		else
+		{
+			System.out.println("No results Found For : "+query);	
+			return;
+		}
 		System.out.println();
 		System.out.println("Final Result for : "+query);
 		for(Integer val:results)
@@ -517,9 +522,17 @@ public class InvertedIndex
 		{
 			op = operation.OR;
 		}
-		else
+		else if("MIX".equals(ops))
 		{
 			op = operation.MIX;
+		}
+		else
+		{
+			if(debug)
+			{
+				System.out.println(" Looks like only one Word was provided , defaulting to OR");
+			}
+			op = operation.OR;// Safe condition in case it is just one word
 		}
 	}
 	public static void main(String[] args) 
@@ -593,7 +606,7 @@ public class InvertedIndex
 		else if(op == operation.MIX)
 		{
 			//mixedQueries(query.toString());
-			results = evaluate(query.toString());
+			results = performShuntingsAlgo(query.toString());
 		}
 		//System.out.println("Sorted Values");
 		//sortMap();
