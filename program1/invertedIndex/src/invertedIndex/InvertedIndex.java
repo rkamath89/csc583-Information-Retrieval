@@ -10,13 +10,14 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Scanner;
 import java.util.Map.Entry;
 import java.util.Stack;
 import java.util.TreeMap;
 
 
-public class InvertedIndex {
-   
+public class InvertedIndex
+{
 	public static enum operation
 	{
 		AND,OR,MIX;
@@ -26,8 +27,129 @@ public class InvertedIndex {
 	static List<String> fileNames = new ArrayList<String>(); // Keep Track of File Names
 	static int documentId = 0; // Keep Track Of  Document Ids
 	static TreeMap<String,LinkedList<Integer>> docListings = new TreeMap<String,LinkedList<Integer>>(); // Document Id and its posting
-	
-	
+
+
+
+	public static LinkedList<Integer> evaluate(String expression)
+	{
+		String[] tokens = expression.split(" ");
+
+		// Stack for List of Documetns containing word
+		Stack<LinkedList<Integer>> documents = new Stack<LinkedList<Integer>>();
+
+		// Stack for Operators AND OR
+		Stack<String> ops = new Stack<String>();
+
+		for(String token:tokens)
+		{
+
+			// Current token is a Word, push it to stack for words
+			if (!"(".equals(token) && !")".equals(token) && !"AND".equals(token) && !"OR".equals(token))
+			{
+				documents.push(docListings.get(token));
+			}
+			// Current token is an opening brace, push it to 'ops'
+			else if ("(".equals(token))
+				ops.push(token);
+
+			// Closing brace encountered, solve entire brace
+			else if (")".equals(token))
+			{
+				while (!"(".equals(ops.peek()))
+					documents.push(applyOp(ops.pop(), documents.pop(), documents.pop()));
+				ops.pop();
+			}
+
+			// Current token is an operator.
+			else if ("AND".equals(token) || "OR".equals(token))
+			{
+				// While top of 'ops' has same or greater precedence to current
+				// token, which is an operator. Apply operator on top of 'ops'
+				// to top two elements in values stack
+				while (!ops.empty() && hasPrecedence(token, ops.peek()))
+					documents.push(applyOp(ops.pop(), documents.pop(), documents.pop()));
+
+				// Push current token to 'ops'.
+				ops.push(token);
+			}
+		}
+
+		// Entire expression has been parsed at this point, apply remaining
+		// ops to remaining values
+		while (!ops.empty())
+			documents.push(applyOp(ops.pop(), documents.pop(), documents.pop()));
+
+		// Top of 'values' contains result, return it
+		return documents.pop();
+	}
+
+	// Returns true if 'op2' has higher or same precedence as 'op1',
+	// otherwise returns false.
+	public static boolean hasPrecedence(String op1, String op2)
+	{
+		if ("(".equals(op2) || ")".equals(op2))
+			return false;
+		if ("AND".equals(op1) && "OR".equals(op2))
+			return false;
+		else
+			return true;
+	}
+
+	// A utility method to apply an operator 'op' on operands 'a' 
+	// and 'b'. Return the result.
+	public static LinkedList<Integer>  applyOp(String op, LinkedList<Integer> b, LinkedList<Integer> a)
+	{
+		LinkedList<Integer> result = new LinkedList<Integer>();
+		if("AND".equals(op))
+		{
+			result = performAndOperation(a,b);
+		}
+		else if("OR".equals(op))
+		{
+			result = performOrOperation(a, b);
+		}
+		return result;
+	}
+
+	public static LinkedList<Integer> performAndOperation(LinkedList<Integer> ll1,LinkedList<Integer> ll2)
+	{
+		LinkedList<Integer> result = new LinkedList<Integer>();
+		for(Integer docId:ll1)
+		{
+			for(Integer docId2:ll2)
+			{
+				if((docId == docId2) && !result.contains(docId))
+				{
+					result.add(docId);
+				}
+			}
+		}
+
+		return result;
+	}
+	public static LinkedList<Integer> performOrOperation(LinkedList<Integer> ll1,LinkedList<Integer> ll2)
+	{
+		LinkedList<Integer> result = new LinkedList<Integer>();
+		for(Integer docId:ll1)
+		{
+			if(!result.contains(docId))
+			{
+				result.add(docId);
+			}
+
+		}
+		for(Integer docId2:ll2)
+		{
+			if(!result.contains(docId2))
+			{
+				result.add(docId2);
+			}
+
+		}
+
+		return result;
+	}
+
 	static void mixedQueries(String query)
 	{
 		Stack<String> queryStack = new Stack<String>();
@@ -57,7 +179,7 @@ public class InvertedIndex {
 			{
 				queryStack.push(splitWord);
 			}
-				
+
 		}
 		StringBuilder tempStr = new StringBuilder();
 		while(!queryStack.isEmpty())
@@ -69,9 +191,9 @@ public class InvertedIndex {
 		}
 		queryFetched.append(tempStr);
 		System.out.println("Query :"+queryFetched.toString());
-		
+
 	}
-	
+
 	static List<Integer> orQueries(String query)
 	{
 		List<Integer> result = new ArrayList<Integer>();
@@ -130,8 +252,8 @@ public class InvertedIndex {
 				result.clear();
 				tempResult.clear();
 			}
-			
-		
+
+
 		}
 		if(debug)
 		{
@@ -146,10 +268,10 @@ public class InvertedIndex {
 		}
 		return result;
 	}
-	
-	
-	
-	
+
+
+
+
 	static List<Integer> andQueries(String query)
 	{
 		List<Integer> result = new ArrayList<Integer>();
@@ -177,7 +299,7 @@ public class InvertedIndex {
 			}
 			System.out.println();
 		}
-		
+
 		for(String queryWord:termsWithoutKeyWord)
 		{
 			try
@@ -225,7 +347,7 @@ public class InvertedIndex {
 				result.clear();
 				tempResult.clear();
 			}
-			
+
 		}
 		if(debug)
 		{
@@ -240,8 +362,8 @@ public class InvertedIndex {
 		}
 		return result;
 	} 
-	
-	
+
+
 	static void printContentsOfMap(TreeMap<String,LinkedList<Integer>> printMap)
 	{
 		System.out.println("--------------------------------------------");
@@ -261,7 +383,7 @@ public class InvertedIndex {
 		}
 		System.out.println("--------------------------------------------");
 		System.out.println();
-			
+
 	}
 	/*Old function , i shiftd to TreeMap this maintains ordering
 	 * 
@@ -328,19 +450,19 @@ public class InvertedIndex {
 	{
 		for(String fname: fileNames)
 		{
-			
+
 			String line = null;
 			try
 			{
 				FileReader inFile = new FileReader(fname);
 				BufferedReader bufffer = new BufferedReader(inFile);
-				  while((line = bufffer.readLine()) != null) 
-				  {
-					  	documentId++;
-		                parseLineForDocId(documentId,line);
-		          } 
-				  bufffer.close();
-				
+				while((line = bufffer.readLine()) != null) 
+				{
+					documentId++;
+					parseLineForDocId(documentId,line);
+				} 
+				bufffer.close();
+
 			}
 			catch(Exception e)
 			{
@@ -348,8 +470,8 @@ public class InvertedIndex {
 				System.out.println("Exception :: "+e);
 				e.printStackTrace();
 			}
-			
-			
+
+
 		}
 	}
 	public static void printResults(List<Integer> results,String query)
@@ -363,7 +485,7 @@ public class InvertedIndex {
 		for(Integer val:results)
 		{
 			System.out.print(val+" ,");
-			
+
 		}
 		System.out.println();
 	}
@@ -434,7 +556,7 @@ public class InvertedIndex {
 				query.append(arguments+" ");
 			}
 		}
-		
+
 		checkTypeOfOperation(query.toString());// Check if AND ,OR , MIX
 		if(debug)
 		{
@@ -447,11 +569,11 @@ public class InvertedIndex {
 		}
 		readFileContents();
 		//System.out.println(" Unsorted Values");
-		
+
 		// Print the Inverted Index
 		printContentsOfMap(docListings);
-		
-		
+
+
 		if(op == operation.AND)
 		{
 			if(debug)
@@ -470,12 +592,13 @@ public class InvertedIndex {
 		}
 		else if(op == operation.MIX)
 		{
-			mixedQueries(query.toString());
+			//mixedQueries(query.toString());
+			results = evaluate(query.toString());
 		}
 		//System.out.println("Sorted Values");
 		//sortMap();
 		//if(debug)
-			//printContentsOfMap(sortedDocListings);
+		//printContentsOfMap(sortedDocListings);
 		printResults(results,query.toString());
 
 	}
